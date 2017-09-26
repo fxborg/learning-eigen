@@ -27,6 +27,7 @@ private:
 	double periodogram(const std::valarray<double> & F, const int k);
 	double LFvalue_vect(const cv::Mat1d & M, const double omega0, const int ET);
 	void reconstruct(const cv::Mat1d & sing_values, const cv::Mat1d & U, const cv::Mat1d & V, const std::vector<int> ET, cv::Mat1d & F);
+
 	const unsigned int m_size;
 	const unsigned int m_L;
 	const double m_omega0;
@@ -46,4 +47,5 @@ EXPORT void __stdcall Destroy(CSSA* instance);
 //--- インスタンス経由でpushメソッドをコール
 EXPORT int __stdcall Push(CSSA* instance, const int x, const double y, const time_t t0, const time_t t1);
 //--- 予測値を計算
-EXPORT int __stdcall Calculate(CSSA* instance);
+EXPORT int __stdcall Calculate(CSSA* instance );
+
