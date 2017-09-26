@@ -21,15 +21,15 @@ public:
 
 private:
 	double calc_cmax(const std::deque<double> & series);
-	void ssa(const std::deque<double> & series);
-	int rank(const cv::Mat1d & M);
+	void ssa(const std::deque<double> & series, cv::Mat1d &S, cv::Mat1d &V, cv::Mat1d &U);
 	unsigned int minmax(const unsigned int n, const unsigned int min, const unsigned int max);
 	double minmax(const double n, const double min, const double max);
 	double periodogram(const std::valarray<double> & F, const int k);
 	double LFvalue_vect(const cv::Mat1d & M, const double omega0, const int ET);
+	void reconstruct(const cv::Mat1d & sing_values, const cv::Mat1d & U, const cv::Mat1d & V, const std::vector<int> ET, cv::Mat1d & F);
 	const unsigned int m_size;
 	const unsigned int m_L;
-	const unsigned int m_omega0;
+	const double m_omega0;
 	const unsigned int m_max_et;
 	const double m_c0min;
 	const double m_c0max;
@@ -46,5 +46,4 @@ EXPORT void __stdcall Destroy(CSSA* instance);
 //--- インスタンス経由でpushメソッドをコール
 EXPORT int __stdcall Push(CSSA* instance, const int x, const double y, const time_t t0, const time_t t1);
 //--- 予測値を計算
-EXPORT int __stdcall Calculate(CSSA* instance );
-
+EXPORT int __stdcall Calculate(CSSA* instance);
