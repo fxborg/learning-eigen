@@ -51,17 +51,15 @@ int CSSA::push(const int x, const double y, const time_t t0, const time_t t1)
 
 int CSSA::calculate()
 {
-	std::cout << "calc" << std::endl;
-	if (!m_series.is_adding())return false;
+	if (!m_series.is_adding())return 0;
 	const std::deque<double> & series = m_series.get_stats_series();
-	std::cout << "!!!" << std::endl;
-
-	double v = calc_cmax(series);
+	if (series.size() != m_size+1)return 0;
+	double v = calc_cmax(std::vector<double>(series.cbegin(), series.cend()- 1));
 	return 0;
 }
 
 
-void CSSA::ssa(const std::deque<double> & series, cv::Mat1d &S, cv::Mat1d &V, cv::Mat1d &U)
+void CSSA::ssa(const std::vector<double> & series, cv::Mat1d &S, cv::Mat1d &V, cv::Mat1d &U)
 {
 	int k = m_size - m_L + 1;
 	int L = int(m_L);
@@ -73,7 +71,7 @@ void CSSA::ssa(const std::deque<double> & series, cv::Mat1d &S, cv::Mat1d &V, cv
 	std::vector<double> vec;
 	vec.reserve(L*k);
 	int adj = series.size() - m_size;
-	auto it = series.cbegin() + adj;
+	auto it = series.cbegin();
 
 	for (int i = 0; i < L; i++)
 	{
@@ -90,7 +88,7 @@ void CSSA::ssa(const std::deque<double> & series, cv::Mat1d &S, cv::Mat1d &V, cv
 
 	// SVD
 	cv::SVD::compute(X, S, U, V);
-	cv::Mat1b nonZeroSingularValues = S > 0.0001;
+	cv::Mat1d nonZeroSingularValues = S > 0.0001;
 	// rank
 	int M = cv::countNonZero(nonZeroSingularValues);
 	if (M < L)
@@ -118,12 +116,12 @@ void CSSA::ssa(const std::deque<double> & series, cv::Mat1d &S, cv::Mat1d &V, cv
 
 
 
-double CSSA::calc_cmax(const std::deque<double> & series)
+double CSSA::calc_cmax(const std::vector<double> & series)
 {
+
 	cv::Mat1d sing_values, U, V, trend;
 	ssa(series, sing_values, V, U);
 	int d = std::min(sing_values.rows, int(m_max_et));
-
 	std::cout << V.size() << std::endl;
 	//std::cout << U.rowRange(0,5).colRange(0,5) << std::endl;
 	//  Calculate LowFreq values for all ETs
@@ -132,10 +130,8 @@ double CSSA::calc_cmax(const std::deque<double> & series)
 	{
 		cval_forET[et] = LFvalue_vect(U, m_omega0, et);
 	}
-
 	//---
 	int c0s_amount = floor((m_c0max - m_c0min) / m_c0step) + 1;
-	int c0_i = 1;
 	for (double c0 = m_c0min; c0 <= m_c0max; c0 += m_c0step)
 	{
 		std::vector<int> trend_ETs;
@@ -146,13 +142,32 @@ double CSSA::calc_cmax(const std::deque<double> & series)
 		// reconstruct
 		reconstruct(sing_values, U, V, trend_ETs, trend);
 
-		if (c0 > 0)
-		{
-		}
-		else
-		{
-		}
+		std::vector<double> crit_LFres;
+
+		const cv::Mat1d ts{ series };
+		
+		double crit = (c0 > 0) ? LF_criteria(ts, trend) : 0;
+		crit_LFres.push_back(crit);
+
 	}
+	//---
+	std::deque<double> c0s{ 0.0 };
+	for (double c0 = m_c0min; c0 < m_c0max; c0 += m_c0step)
+	{
+		c0s.push_back(c0);
+	}
+
+	std::valarray<double> tmp1{ std::vector<double>(c0s).data() };
+	c0s.
+	std::valarray<double> tmp2{ 0.0 };
+
+	tmp(2:length(crit_LFres) + 1) = crit_LFres;
+	C0Deltas = [crit_LFres, 0] - tmp;
+	C0Deltas = C0Deltas(2:length(C0Deltas) - 1);
+
+	Cmax = 1;
+	CmaxDelta = 0;
+
 
 
 	return 0.0;
@@ -176,19 +191,23 @@ double CSSA::LFvalue_vect(const cv::Mat1d & M, const double omega0, const int ET
 	double nrm = cv::norm(M.col(ET));
 	if (nrm == 0.0)
 	{
-		return -0.0;
+		return -1;
 	}
+
 	cv::Mat1d vect(M.col(ET).t() / nrm);
 	// calculate sum of periodogram values for low frequencies
+
 	int k = 1;
 	double w = 0.0;
 	double val = 0;
+
 	while (w < omega0)
 	{
-		val += periodogram(std::valarray<double>(std::vector<double>(vect).data(),vect.cols), k);
+		val += periodogram(std::valarray<double>(std::vector<double>(vect).data(), vect.cols), k);
 		k = k + 1;
 		w = (k - 1.0) / L;
 	}
+
 	return val;
 }
 
@@ -219,16 +238,16 @@ void CSSA::reconstruct(const cv::Mat1d & sing_values, const cv::Mat1d & U, const
 	for (int i = 0; i < sz; i++)
 	{
 		int ET = ETs[i];
-		const double sing_value{ sing_values(ET,0)};
+		const double sing_value{ sing_values(ET,0) };
 		const cv::Mat1d u{ U.col(ET) };
 		const cv::Mat1d v{ V.row(ET) };
 		const cv::Mat1d Xi{ sing_value * u * v };
 
 		X += Xi;
 	}
-//	std::cout << "X:" << std::endl;
-//	std::cout << X << std::endl;
-	cv::Mat1d Freq(1,N);
+	//	std::cout << "X:" << std::endl;
+	//	std::cout << X << std::endl;
+	cv::Mat1d Freq(1, N);
 	double L0 = std::min(L, K);
 	double K0 = std::max(L, K);
 
@@ -242,7 +261,7 @@ void CSSA::reconstruct(const cv::Mat1d & sing_values, const cv::Mat1d & U, const
 		{
 			d += Y(m, k - m + 1);
 		}
-		Freq(k-1) = 1.0 / k * d;
+		Freq(k - 1) = 1.0 / k * d;
 	}
 	for (int k = L0; k <= K0; k++)
 	{
@@ -252,7 +271,7 @@ void CSSA::reconstruct(const cv::Mat1d & sing_values, const cv::Mat1d & U, const
 		{
 			d += Y(m, k - m + 1);
 		}
-		Freq(k-1) = 1.0 / k * d;
+		Freq(k - 1) = 1.0 / k * d;
 	}
 	for (int k = K0 + 1; k <= N; k++)
 	{
@@ -261,8 +280,18 @@ void CSSA::reconstruct(const cv::Mat1d & sing_values, const cv::Mat1d & U, const
 		{
 			d += Y(m, k - m + 1);
 		}
-		Freq(k-1) = 1.0 / (N - k + 1) * d;
+		Freq(k - 1) = 1.0 / (N - k + 1) * d;
 	}
 	F = std::move(Freq);
 	std::cout << F;
+}
+
+double CSSA::LF_criteria(const cv::Mat1d & ts, const cv::Mat1d & trend)
+{
+
+	double lf_ts = LFvalue_vect(ts, m_omega0, 0);
+	double lf_res = LFvalue_vect((ts - trend), m_omega0, 0);
+	if (lf_ts == -1 || lf_res == -1) return 0.0;
+
+	return (lf_res / lf_ts);
 }
