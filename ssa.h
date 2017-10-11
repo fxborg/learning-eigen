@@ -19,7 +19,7 @@
 #include "series.h"
 #include "stats.h"
 #include "opencv2/core/core.hpp"
-
+#include "RedSVD-h"
 class CSSA
 {
 public:

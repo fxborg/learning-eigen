@@ -90,6 +90,9 @@ int CSSA::calculate()
 
 
 	const std::vector<double> ts(series.cbegin(), series.cend() - 1);
+	
+
+
 
 	cv::Mat1d sing_values, V, U;
 
@@ -140,6 +143,7 @@ int CSSA::calculate()
 		m_hist_ETs.erase(m_hist_ETs.begin(), m_hist_ETs.begin() + (delsz));
 
 	}
+
 	std::vector<int> certETs{ certainly_ETs() };
 
 	//for (int i = m_hist_ETs.size()-1; i >= 0; i--)
@@ -189,6 +193,7 @@ void CSSA::ssa(const std::vector<double> & series, cv::Mat1d &S, cv::Mat1d &V, c
 	int k = m_size - m_L + 1;
 	int L = int(m_L);
 
+	timer.emplace_back(std::chrono::system_clock::now());
 	std::vector<double> vec;
 	vec.reserve(L*k);
 	int adj = series.size() - m_size;
@@ -200,10 +205,33 @@ void CSSA::ssa(const std::vector<double> & series, cv::Mat1d &S, cv::Mat1d &V, c
 		++it;
 	}
 
+
+
+	timer.emplace_back(std::chrono::system_clock::now());
+
+	typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXd;	Eigen::MatrixXd A = Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(&vec[0], L, k);
 	cv::Mat1d X(L, k, vec.data());
 
+
+
+	timer.emplace_back(std::chrono::system_clock::now());
+	RedSVD::RedSVD<MatrixXd> svd(A,m_max_et);
+	timer.emplace_back(std::chrono::system_clock::now());
+	
+
 	// SVD
+	timer.emplace_back(std::chrono::system_clock::now());
 	cv::SVD::compute(X, S, U, V);
+	timer.emplace_back(std::chrono::system_clock::now());
+
+
+
+
+
+
+
+
+
 	cv::Mat1d nonZeroSingularValues = S > 0.0001;
 
 
@@ -215,7 +243,6 @@ void CSSA::ssa(const std::vector<double> & series, cv::Mat1d &S, cv::Mat1d &V, c
 		U = U.colRange(0, M);
 	}
 	V = V.rowRange(0, M).t();
-
 }
 
 
