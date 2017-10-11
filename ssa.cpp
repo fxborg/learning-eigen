@@ -1,7 +1,7 @@
 ﻿//+------------------------------------------------------------------+
 //|                                                          ssa.cpp |
 //| SSA Trend                                 Copyright 2017, fxborg |
-//| this is a c++ reimplementation of AutoSSA Matlab package         |
+//| this is a c++ reimplementation of AutoSSA Matlab package         |
 //| AutoSSA(http://www.pdmi.ras.ru/~theo/autossa/english/soft.htm)   |
 //|                                   http://fxborg-labo.hateblo.jp/ |
 //+------------------------------------------------------------------+
@@ -90,7 +90,7 @@ int CSSA::calculate()
 
 
 	const std::vector<double> ts(series.cbegin(), series.cend() - 1);
-	
+
 
 
 
@@ -111,7 +111,7 @@ int CSSA::calculate()
 			<< " msec."
 			<< std::endl;
 	}
-	
+
 
 	cv::Mat1d s, u, v;
 
@@ -133,7 +133,7 @@ int CSSA::calculate()
 
 	// calc trend
 	const std::vector<int>trend_ETs{ calc_trend(ts, c0maxval, s, v, u) };
-	
+
 	m_hist_ETs.push_back(std::move(trend_ETs));
 	// history
 	if (m_hist_ETs.size() > m_hist_size)
@@ -190,6 +190,7 @@ double CSSA::slope(const int period)
 
 void CSSA::ssa(const std::vector<double> & series, cv::Mat1d &S, cv::Mat1d &V, cv::Mat1d &U)
 {
+
 	int k = m_size - m_L + 1;
 	int L = int(m_L);
 
@@ -210,7 +211,7 @@ void CSSA::ssa(const std::vector<double> & series, cv::Mat1d &S, cv::Mat1d &V, c
 	timer.emplace_back(std::chrono::system_clock::now());
 
 
-	typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXd;
+	//	typedef Matrix<double, Dynamic, Dynamic> MatrixXd;
 
 	Eigen::MatrixXd A = Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(&vec[0], L, k);
 
@@ -218,21 +219,25 @@ void CSSA::ssa(const std::vector<double> & series, cv::Mat1d &S, cv::Mat1d &V, c
 
 
 
-	timer.emplace_back(std::chrono::system_clock::now());
-	RedSVD::RedSVD<MatrixXd> svd(A,m_max_et);
-	timer.emplace_back(std::chrono::system_clock::now());
-	
 
-	// SVD
+	// opencv SVD
 	timer.emplace_back(std::chrono::system_clock::now());
 	cv::SVD::compute(X, S, U, V);
 	timer.emplace_back(std::chrono::system_clock::now());
 
+	// eigen3 SVD 
+	timer.emplace_back(std::chrono::system_clock::now());
+	//	JacobiSVD< MatrixXd> svd(A, ComputeThinU | ComputeThinV);	timer.emplace_back(std::chrono::system_clock::now());
 
 
-
-
-
+	// RedSVD
+	timer.emplace_back(std::chrono::system_clock::now());
+	RedSVD::RedSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeThinU | Eigen::ComputeThinV);
+	timer.emplace_back(std::chrono::system_clock::now());
+	cv::Mat1d U2,S2,V2;
+	cv::eigen2cv(svd.matrixU(), U2);
+	cv::eigen2cv(svd.singularValues(), S2);
+	cv::eigen2cv(svd.matrixV(), V2);
 
 
 
@@ -246,13 +251,16 @@ void CSSA::ssa(const std::vector<double> & series, cv::Mat1d &S, cv::Mat1d &V, c
 		S = S.rowRange(0, M);
 		U = U.colRange(0, M);
 	}
+
 	V = V.rowRange(0, M).t();
+
+
 }
 
 
 double CSSA::calc_cmax(const std::vector<double> & series, const cv::Mat1d & sing_values, const cv::Mat1d & V, const cv::Mat1d &U)
 {
-//	timer.emplace_back(std::chrono::system_clock::now());
+	//	timer.emplace_back(std::chrono::system_clock::now());
 
 	cv::Mat1d trend;
 	int d = std::min(sing_values.rows, int(m_max_et));
@@ -284,7 +292,7 @@ double CSSA::calc_cmax(const std::vector<double> & series, const cv::Mat1d & sin
 				trend_ETs.push_back(et);
 			}
 		}
-		
+
 
 		// reconstruct
 
@@ -336,7 +344,7 @@ double CSSA::calc_cmax(const std::vector<double> & series, const cv::Mat1d & sin
 	}
 
 
-//	timer.emplace_back(std::chrono::system_clock::now());
+	//	timer.emplace_back(std::chrono::system_clock::now());
 	return cmax;
 }
 
@@ -482,17 +490,17 @@ std::vector<int> CSSA::certainly_ETs()
 		}
 	}
 	std::vector<int> res;
-//	std::cout << "m_hist_coef=" << (m_hist_coef) << std::endl;
-	for (auto &kv: work)
+	//	std::cout << "m_hist_coef=" << (m_hist_coef) << std::endl;
+	for (auto &kv : work)
 	{
-//		std::cout << kv.first << "->" << kv.second;
-//		std::cout << " = " << ((double)kv.second / sz);
+		//		std::cout << kv.first << "->" << kv.second;
+		//		std::cout << " = " << ((double)kv.second / sz);
 		if (((double)kv.second / sz) >= m_hist_coef)
 		{
-//			std::cout << "*";
+			//			std::cout << "*";
 			res.push_back(kv.first);
 		}
-//		std::cout << std::endl;
-	}	
+		//		std::cout << std::endl;
+	}
 	return res;
 }

@@ -1,7 +1,7 @@
 ﻿//+------------------------------------------------------------------+
 //|                                                          ssa.h   |
 //| SSA Trend                                 Copyright 2017, fxborg |
-//| this is a c++ reimplementation of AutoSSA Matlab package         |
+//| this is a c++ reimplementation of AutoSSA Matlab package         |
 //| AutoSSA(http://www.pdmi.ras.ru/~theo/autossa/english/soft.htm)   |
 //|                                   http://fxborg-labo.hateblo.jp/ |
 //+------------------------------------------------------------------+
@@ -18,8 +18,11 @@
 #include <chrono>
 #include "series.h"
 #include "stats.h"
+#include <Eigen/Core>
 #include "opencv2/core/core.hpp"
+#include "opencv2/core/eigen.hpp"
 #include "RedSVD-h"
+//#include <Eigen/Dense>
 class CSSA
 {
 public:
@@ -79,4 +82,3 @@ EXPORT int __stdcall Calculate(CSSA* instance);
 EXPORT bool __stdcall GetResults(CSSA* instance, const size_t idx, double &y);
 
 EXPORT double __stdcall Slope(CSSA* instance, const int period);
-
