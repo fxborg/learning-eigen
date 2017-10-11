@@ -208,8 +208,12 @@ void CSSA::ssa(const std::vector<double> & series, cv::Mat1d &S, cv::Mat1d &V, c
 
 
 	timer.emplace_back(std::chrono::system_clock::now());
-
-	typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXd;	Eigen::MatrixXd A = Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(&vec[0], L, k);
+
+
+	typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXd;
+
+	Eigen::MatrixXd A = Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(&vec[0], L, k);
+
 	cv::Mat1d X(L, k, vec.data());
 
 
