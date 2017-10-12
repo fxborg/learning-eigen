@@ -7,6 +7,11 @@
 //+------------------------------------------------------------------+
 #define EXPORT  extern "C" // __declspec(dllexport)  
 #define _USE_MATH_DEFINES
+
+#define _USE_RED_SVD
+//#define _USE_EIGEN_SVD
+//#define _USE_OPENCV_SVD
+
 #include <deque> 
 #include <vector> 
 #include <unordered_map> 
@@ -21,8 +26,14 @@
 #include <Eigen/Core>
 #include "opencv2/core/core.hpp"
 #include "opencv2/core/eigen.hpp"
+
+#ifdef _USE_RED_SVD
 #include "RedSVD-h"
-//#include <Eigen/Dense>
+#endif //_USE_RED_SVD
+
+#ifdef _USE_EIGEN_SVD
+#include <Eigen/SVD>
+#endif //_USE_EIGEN_SVD
 class CSSA
 {
 public:

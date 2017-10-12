@@ -87,30 +87,19 @@ int CSSA::calculate()
 	m_cval_for_ET.erase(m_cval_for_ET.begin(), m_cval_for_ET.end());
 	m_memo_criteria.erase(m_memo_criteria.begin(), m_memo_criteria.end());
 
-
-
 	const std::vector<double> ts(series.cbegin(), series.cend() - 1);
-
-
-
 
 	cv::Mat1d sing_values, V, U;
 
 	timer.emplace_back(std::chrono::system_clock::now());
 	//--- SSA
+
 	ssa(ts, sing_values, V, U);
 	//--- cmax
 
-	timer.emplace_back(std::chrono::system_clock::now());
 	double c0maxval = calc_cmax(ts, sing_values, V, U);
 	timer.emplace_back(std::chrono::system_clock::now());
-	for (int i = 1; i < timer.size(); i++)
-	{
-		std::cout << "time" << (i - 1) << " -> time" << i << " = "
-			<< std::chrono::duration_cast<std::chrono::milliseconds>(timer[i] - timer[i - 1]).count()
-			<< " msec."
-			<< std::endl;
-	}
+
 
 
 	cv::Mat1d s, u, v;
@@ -133,6 +122,8 @@ int CSSA::calculate()
 
 	// calc trend
 	const std::vector<int>trend_ETs{ calc_trend(ts, c0maxval, s, v, u) };
+
+	std::cout << "trend_ETs : " << join_ETs(trend_ETs) << std::endl;
 
 	m_hist_ETs.push_back(std::move(trend_ETs));
 	// history
@@ -157,6 +148,14 @@ int CSSA::calculate()
 	m_results = std::move(res);
 	timer.emplace_back(std::chrono::system_clock::now());
 
+	for (int i = 1; i < (int)timer.size(); i++)
+	{
+		std::cout << "time" << (i - 1) << " -> time" << i << " = "
+			<< std::chrono::duration_cast<std::chrono::milliseconds>(timer[i] - timer[i - 1]).count()
+			<< " msec."
+			<< std::endl;
+	}
+
 	return m_results.size();
 }
 
@@ -167,10 +166,11 @@ std::vector<int> CSSA::calc_trend(const std::vector<double> & series, const doub
 	int maxET = std::min((int)m_cval_for_ET.size(), U.cols);
 
 	std::vector<int> trend_ETs;
-
+	std::cout << "---------calc trend----------------" << std::endl;
 	for (int et = 0; et < maxET; et++)
 	{
-		if (m_cval_for_ET[et] > c0)trend_ETs.push_back(et);
+		std::cout << et << ":" << m_cval_for_ET[et] << std::endl;
+		if (m_cval_for_ET[et] > c0) trend_ETs.push_back(et);
 	}
 	return trend_ETs;
 }
@@ -194,7 +194,6 @@ void CSSA::ssa(const std::vector<double> & series, cv::Mat1d &S, cv::Mat1d &V, c
 	int k = m_size - m_L + 1;
 	int L = int(m_L);
 
-	timer.emplace_back(std::chrono::system_clock::now());
 	std::vector<double> vec;
 	vec.reserve(L*k);
 	int adj = series.size() - m_size;
@@ -206,44 +205,16 @@ void CSSA::ssa(const std::vector<double> & series, cv::Mat1d &S, cv::Mat1d &V, c
 		++it;
 	}
 
-
-
-	timer.emplace_back(std::chrono::system_clock::now());
-
-
-	//	typedef Matrix<double, Dynamic, Dynamic> MatrixXd;
-
-	Eigen::MatrixXd A = Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(&vec[0], L, k);
-
+#ifdef _USE_OPENCV_SVD
+	std::cout << "---------------- opencv svd ----------------------" << std::endl;
 	cv::Mat1d X(L, k, vec.data());
-
-
-
 
 	// opencv SVD
 	timer.emplace_back(std::chrono::system_clock::now());
 	cv::SVD::compute(X, S, U, V);
 	timer.emplace_back(std::chrono::system_clock::now());
 
-	// eigen3 SVD 
-	timer.emplace_back(std::chrono::system_clock::now());
-	//	JacobiSVD< MatrixXd> svd(A, ComputeThinU | ComputeThinV);	timer.emplace_back(std::chrono::system_clock::now());
-
-
-	// RedSVD
-	timer.emplace_back(std::chrono::system_clock::now());
-	RedSVD::RedSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeThinU | Eigen::ComputeThinV);
-	timer.emplace_back(std::chrono::system_clock::now());
-	cv::Mat1d U2,S2,V2;
-	cv::eigen2cv(svd.matrixU(), U2);
-	cv::eigen2cv(svd.singularValues(), S2);
-	cv::eigen2cv(svd.matrixV(), V2);
-
-
-
 	cv::Mat1d nonZeroSingularValues = S > 0.0001;
-
-
 	// rank
 	int M = cv::countNonZero(nonZeroSingularValues);
 	if (M < L)
@@ -251,9 +222,55 @@ void CSSA::ssa(const std::vector<double> & series, cv::Mat1d &S, cv::Mat1d &V, c
 		S = S.rowRange(0, M);
 		U = U.colRange(0, M);
 	}
-
 	V = V.rowRange(0, M).t();
+	timer.emplace_back(std::chrono::system_clock::now());
+#endif
 
+#ifdef _USE_EIGEN_SVD
+	std::cout << "---------------- eigen svd ----------------------" << std::endl;
+	Eigen::MatrixXd X = Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(&vec[0], L, k);
+	timer.emplace_back(std::chrono::system_clock::now());
+	Eigen::JacobiSVD< Eigen::MatrixXd> svd(X, Eigen::ComputeThinU | Eigen::ComputeThinV); //JacobiSVD
+	timer.emplace_back(std::chrono::system_clock::now());
+
+	cv::eigen2cv(svd.singularValues(), S);
+	cv::eigen2cv(svd.matrixU(), U);
+	cv::eigen2cv(svd.matrixV(), V);
+
+	cv::Mat1d nonZeroSingularValues = S > 0.0001;
+	// rank
+	int M = cv::countNonZero(nonZeroSingularValues);
+	if (M < L)
+	{
+		S = S.rowRange(0, M);
+		U = U.colRange(0, M);
+		V = V.colRange(0, M);
+	}
+	timer.emplace_back(std::chrono::system_clock::now());
+#endif
+
+#ifdef _USE_RED_SVD
+	std::cout << "---------------- red svd ----------------------" << std::endl;
+	Eigen::MatrixXd X = Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(&vec[0], L, k);
+	timer.emplace_back(std::chrono::system_clock::now());
+	RedSVD::RedSVD<Eigen::MatrixXd> svd(X, L); 	// RedSVD
+	timer.emplace_back(std::chrono::system_clock::now());
+
+	cv::eigen2cv(svd.singularValues(), S);
+	cv::eigen2cv(svd.matrixU(), U);
+	cv::eigen2cv(svd.matrixV(), V);
+
+	cv::Mat1d nonZeroSingularValues = S > 0.0001;
+	// rank
+	int M = cv::countNonZero(nonZeroSingularValues);
+	if (M < L)
+	{
+		S = S.rowRange(0, M);
+		U = U.colRange(0, M);
+		V = V.colRange(0, M);
+	}
+	timer.emplace_back(std::chrono::system_clock::now());
+#endif
 
 }
 
@@ -479,7 +496,7 @@ std::vector<int> CSSA::certainly_ETs()
 {
 	std::map<int, int> work;
 	int sz = m_hist_ETs.size();
-	if (sz == 0) return {};
+	if (sz == 0) return{};
 
 	for (auto &vec : m_hist_ETs)
 	{
