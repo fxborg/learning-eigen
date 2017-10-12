@@ -8,9 +8,10 @@
 #define EXPORT  extern "C" // __declspec(dllexport)  
 #define _USE_MATH_DEFINES
 
-#define _USE_RED_SVD
+//#define _USE_RED_SVD
 //#define _USE_EIGEN_SVD
-//#define _USE_OPENCV_SVD
+#define _USE_OPENCV_SVD
+#define _USE_SVDLIBC
 
 #include <deque> 
 #include <vector> 
@@ -26,7 +27,11 @@
 #include <Eigen/Core>
 #include "opencv2/core/core.hpp"
 #include "opencv2/core/eigen.hpp"
-
+#ifdef _USE_SVDLIBC
+extern "C" {  // For using C code from C++ code. https://github.com/mohit-shrma/bilinear-models/blob/95e083c96941c10a18fb7ea292da1fb4855e6afe/mathUtil.cpp
+	#include "svdlib.h"
+}
+#endif //_USE_SVDLIBC
 #ifdef _USE_RED_SVD
 #include "RedSVD-h"
 #endif //_USE_RED_SVD

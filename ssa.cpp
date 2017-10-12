@@ -91,14 +91,11 @@ int CSSA::calculate()
 
 	cv::Mat1d sing_values, V, U;
 
-	timer.emplace_back(std::chrono::system_clock::now());
 	//--- SSA
-
 	ssa(ts, sing_values, V, U);
 	//--- cmax
 
 	double c0maxval = calc_cmax(ts, sing_values, V, U);
-	timer.emplace_back(std::chrono::system_clock::now());
 
 
 
@@ -146,7 +143,6 @@ int CSSA::calculate()
 
 	const std::vector<double> res{ reconstruct(sing_values, U, V, certETs) };
 	m_results = std::move(res);
-	timer.emplace_back(std::chrono::system_clock::now());
 
 	for (int i = 1; i < (int)timer.size(); i++)
 	{
@@ -204,7 +200,33 @@ void CSSA::ssa(const std::vector<double> & series, cv::Mat1d &S, cv::Mat1d &V, c
 		std::copy(it, it + k, std::back_inserter(vec));
 		++it;
 	}
+#ifdef _USE_SVDLIBC
+	std::cout << "---------------- svdlib.h ----------------------" << std::endl;
 
+	int nrows = L;
+	int ncols = k;
+	//create empty dense matrix 
+	DMat dW = svdNewDMat(nrows, ncols);
+	//assign value in row major order
+	for (int i = 0; i < nrows; i++) 
+	{
+		for (int j = 0; j < ncols; j++) 
+		{
+			dW->value[i][j] = vec[i*ncols+j];
+		}
+	}
+	//convert DMat to sparse
+	SMat sW = svdConvertDtoS(dW);
+	//compute top-rank svd
+	SVDRec svd = svdLAS2A(sW, nrows);
+
+	std::cout << "\nDimensionality: " << svd->d;
+	svdFreeDMat(dW);
+	svdFreeSMat(sW);
+	svdFreeSVDRec(svd);
+
+
+#endif
 #ifdef _USE_OPENCV_SVD
 	std::cout << "---------------- opencv svd ----------------------" << std::endl;
 	cv::Mat1d X(L, k, vec.data());
@@ -214,15 +236,31 @@ void CSSA::ssa(const std::vector<double> & series, cv::Mat1d &S, cv::Mat1d &V, c
 	cv::SVD::compute(X, S, U, V);
 	timer.emplace_back(std::chrono::system_clock::now());
 
+	Eigen::MatrixXd EU, ES, EV;
+	cv::cv2eigen(S, ES);
+	cv::cv2eigen(U, EU);
+	cv::cv2eigen(V, EV);
+
+//	std::cout << EU*ES* EV << std::endl;
+	std::cout << "U: " << EU.rows() << "," << EU.cols() << std::endl;
+	std::cout << "S: " << ES.rows() << "," <<  ES.cols() << std::endl;
+	std::cout << "V: " << EV.rows() << "," << EV.cols() << std::endl;
+
+
 	cv::Mat1d nonZeroSingularValues = S > 0.0001;
 	// rank
 	int M = cv::countNonZero(nonZeroSingularValues);
+
+
 	if (M < L)
 	{
 		S = S.rowRange(0, M);
 		U = U.colRange(0, M);
 	}
 	V = V.rowRange(0, M).t();
+	
+
+
 	timer.emplace_back(std::chrono::system_clock::now());
 #endif
 
@@ -233,9 +271,18 @@ void CSSA::ssa(const std::vector<double> & series, cv::Mat1d &S, cv::Mat1d &V, c
 	Eigen::JacobiSVD< Eigen::MatrixXd> svd(X, Eigen::ComputeThinU | Eigen::ComputeThinV); //JacobiSVD
 	timer.emplace_back(std::chrono::system_clock::now());
 
-	cv::eigen2cv(svd.singularValues(), S);
-	cv::eigen2cv(svd.matrixU(), U);
-	cv::eigen2cv(svd.matrixV(), V);
+	Eigen::MatrixXd ES{ svd.singularValues() };
+	Eigen::MatrixXd EU{ svd.matrixU() };
+	Eigen::MatrixXd EV{ svd.matrixV() };
+
+	cv::eigen2cv(ES, S);
+	cv::eigen2cv(EU, U);
+	cv::eigen2cv(EV, V);
+
+//	std::cout << EU*ES* EV.transpose() << std::endl;
+	std::cout << "U: " << EU.rows() << "," << EU.cols() << std::endl;
+	std::cout << "S: " << ES.rows() << "," << ES.cols() << std::endl;
+	std::cout << "V: " << EV.rows() << "," << EV.cols() << std::endl;
 
 	cv::Mat1d nonZeroSingularValues = S > 0.0001;
 	// rank
@@ -250,15 +297,27 @@ void CSSA::ssa(const std::vector<double> & series, cv::Mat1d &S, cv::Mat1d &V, c
 #endif
 
 #ifdef _USE_RED_SVD
-	std::cout << "---------------- red svd ----------------------" << std::endl;
+//	std::cout << "---------------- red svd ----------------------" << std::endl;
 	Eigen::MatrixXd X = Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(&vec[0], L, k);
+
 	timer.emplace_back(std::chrono::system_clock::now());
 	RedSVD::RedSVD<Eigen::MatrixXd> svd(X, L); 	// RedSVD
 	timer.emplace_back(std::chrono::system_clock::now());
 
-	cv::eigen2cv(svd.singularValues(), S);
-	cv::eigen2cv(svd.matrixU(), U);
-	cv::eigen2cv(svd.matrixV(), V);
+	Eigen::MatrixXd ES{ svd.singularValues() };
+	Eigen::MatrixXd EU{ svd.matrixU() };
+	Eigen::MatrixXd EV{ svd.matrixV() };
+
+	cv::eigen2cv(ES, S);
+	cv::eigen2cv(EU, U);
+	cv::eigen2cv(EV, V);
+	std::cout <<"k " << k << std::endl;
+	std::cout <<"L "<< L << std::endl;
+
+//	std::cout << EU*ES*EV.transpose() << std::endl;
+	std::cout << "U: " << EU.rows() << "," << EU.cols() << std::endl;
+	std::cout << "S: " << ES.rows() << "," << ES.cols() << std::endl;
+	std::cout << "V: " << EV.rows() << "," << EV.cols() << std::endl;
 
 	cv::Mat1d nonZeroSingularValues = S > 0.0001;
 	// rank
